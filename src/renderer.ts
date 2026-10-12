@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { createGeometry } from './shapes';
 import { MAX_BODIES, type Sim } from './physics';
 import { PALETTES, SHAPE_KINDS, type Backdrop, type PaletteId, type Settings, type ShapeKind } from './settings';
-import { normalize, scale, type Vec3, vec3 } from './math';
+import { lampDirection, REST_DOWN, type Vec3 } from './math';
 
 export type QualityLevel = 'low' | 'medium' | 'high';
 
@@ -55,7 +55,16 @@ export class Renderer {
 
     this.material = new THREE.MeshPhysicalMaterial({ color: 0xffffff });
 
-    this.wallMaterial = new THREE.MeshStandardMaterial({ side: THREE.BackSide, roughness: 0.92, metalness: 0 });
+    // shadowSide: the walls have no thickness, so render both faces into the shadow map.
+    this.wallMaterial = new THREE.MeshStandardMaterial({
+      side: THREE.BackSide,
+      shadowSide: THREE.DoubleSide,
+      roughness: 0.92,
+      metalness: 0,
+      // Environment light ignores shadows, so keep it low on the walls or the
+      // shadows they throw on each other wash out.
+      envMapIntensity: 0.2,
+    });
     this.walls = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), this.wallMaterial);
     this.checker = createCheckerTexture(this.renderer.capabilities.getMaxAnisotropy());
     this.walls.receiveShadow = true;
@@ -76,10 +85,10 @@ export class Renderer {
     this.fill = new THREE.PointLight(0xffffff, 1, 0, 0);
     this.scene.add(this.fill);
 
-    this.key = new THREE.DirectionalLight(0xffffff, 2.6);
+    this.key = new THREE.DirectionalLight(0xfff4e6, 2.6); // warm, like a room lamp
     this.key.castShadow = true;
-    this.key.shadow.bias = -0.0004;
-    this.key.shadow.normalBias = 0.02;
+    this.key.shadow.bias = -0.0005;
+    this.key.shadow.normalBias = 0.04;
     this.scene.add(this.key, this.key.target);
 
     this.buildMeshes('high');
@@ -96,7 +105,7 @@ export class Renderer {
     this.walls.geometry = createWallGeometry(box.w, box.h, box.d);
     this.rim.scale.set(box.w, box.h, box.d);
     this.fill.position.set(0, 0, box.d / 2 + box.d * 0.6);
-    const half = Math.max(box.w, box.h, box.d) * 0.75;
+    const half = Math.hypot(box.w, box.h, box.d) / 2 + 1;
     const cam = this.key.shadow.camera;
     cam.left = cam.bottom = -half;
     cam.right = cam.top = half;
@@ -124,8 +133,8 @@ export class Renderer {
     this.material.clearcoat = s.clearcoat;
     this.material.clearcoatRoughness = 0.1;
     this.key.intensity = s.lightIntensity;
-    this.hemi.intensity = 0.3 + s.lightIntensity * 0.1;
-    this.fill.intensity = 0.4 + s.lightIntensity * 0.35;
+    this.hemi.intensity = 0.15 + s.lightIntensity * 0.05;
+    this.fill.intensity = 0.12 + s.lightIntensity * 0.1;
     this.scene.environmentIntensity = s.envIntensity;
     this.shadowsWanted = s.shadows;
     this.applyShadows();
@@ -179,11 +188,14 @@ export class Renderer {
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
   }
 
-  /** Points the key light. With follow-tilt the light stays put in the "real" world as the box turns. */
-  updateLight(gravityDir: Vec3, follow: boolean): void {
-    const g = follow ? normalize(gravityDir) : vec3(0, -0.6, -0.8);
-    const up = scale(g, -1);
-    const dir = normalize(vec3(up.x * 0.75 + 0.25, up.y * 0.75 + 0.3, up.z * 0.4 + 0.85));
+  /**
+   * Points the key light at the box from a lamp in front of the phone. With
+   * follow-tilt the lamp stays put in the room, so tilting the phone changes
+   * the angle the light comes in at and the walls throw shadows inside.
+   * `down` is the phone's (smoothed) gravity direction.
+   */
+  updateLight(down: Vec3, follow: boolean): void {
+    const dir = lampDirection(follow ? down : REST_DOWN);
     const dist = 60;
     this.key.position.set(dir.x * dist, dir.y * dist, dir.z * dist);
     this.key.target.position.set(0, 0, 0);
@@ -215,6 +227,7 @@ export class Renderer {
     }
     for (const k of SHAPE_KINDS) this.meshes[k].castShadow = on;
     this.walls.receiveShadow = on;
+    this.walls.castShadow = on;
     this.material.needsUpdate = true;
     this.wallMaterial.needsUpdate = true;
   }
@@ -299,6 +312,13 @@ const CHECKER_TILE = 2.2;
  */
 function createWallGeometry(w: number, h: number, d: number): THREE.BufferGeometry {
   const geo = new THREE.BoxGeometry(w, h, d);
+  // Drop the front (+z) face. It's culled when drawn, but it would still
+  // block the lamp in the shadow map now that the walls cast shadows.
+  const index = geo.index!;
+  const FRONT = 4; // BoxGeometry face order: +x, -x, +y, -y, +z, -z
+  const kept = Array.from(index.array).filter((_, i) => Math.floor(i / 6) !== FRONT);
+  geo.setIndex(kept);
+  geo.clearGroups();
   const tile = d / Math.max(1, Math.round(d / CHECKER_TILE));
   const period = tile * 2; // the texture holds 2×2 squares
   const pos = geo.attributes.position;

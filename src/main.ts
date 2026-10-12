@@ -76,6 +76,8 @@ async function main(): Promise<void> {
   let tiltDir: Vec3 = { ...REST_TILT };
   let gravity: Vec3 = scale(tiltDir, s.gravity);
   let motionSmooth: Vec3 = vec3(0, -1, 0);
+  /** Which way is down for the phone, smoothed so shakes don't flicker the lighting. */
+  let pose: Vec3 = { ...REST_TILT };
   let paused = false;
   let acc = 0;
   let last = performance.now();
@@ -361,7 +363,7 @@ async function main(): Promise<void> {
 
   applyAll();
   respawn();
-  view.updateLight(gravity, s.lightFollowsTilt);
+  view.updateLight(pose, s.lightFollowsTilt);
 
   if (motion.state === 'off' && mobile) void motion.enable(); // Android: no prompt needed
   setTimeout(() => {
@@ -413,7 +415,9 @@ async function main(): Promise<void> {
 
     updateViewpoint(dt);
     view.updateCamera(viewpoint.eye, viewDistance(), s.parallax);
-    view.updateLight(gravity, s.lightFollowsTilt);
+    const poseTarget = motion.active && !motion.isStale() ? motionSmooth : tiltDir;
+    pose = normalize(lerpVec(pose, normalize(poseTarget), smoothing(dt, 0.15)));
+    view.updateLight(pose, s.lightFollowsTilt);
     view.render(sim, s.palette, alpha);
 
     measure(now);

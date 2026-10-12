@@ -187,3 +187,42 @@ export function decideGyroMapping(
   if (other.n >= minVotes / 2 && Math.abs(other.mean) > Math.abs(best.mean) - 0.3) return null;
   return { mapping: best.mapping, sign: best.mean > 0 ? 1 : -1 };
 }
+
+/**
+ * Applies the smallest rotation that takes unit vector `from` to unit vector
+ * `to` onto `v` (Rodrigues' formula).
+ */
+export function rotateByArc(v: Vec3, from: Vec3, to: Vec3): Vec3 {
+  const a = normalize(from);
+  const b = normalize(to);
+  const c = clamp(dot(a, b), -1, 1);
+  let axis = cross(a, b);
+  const s = length(axis);
+  if (s < 1e-9) {
+    if (c > 0) return { ...v };
+    // Opposite vectors: any perpendicular axis works for a half turn.
+    axis = normalize(Math.abs(a.x) < 0.9 ? cross(a, vec3(1, 0, 0)) : cross(a, vec3(0, 1, 0)));
+  } else {
+    axis = scale(axis, 1 / s);
+  }
+  const angle = Math.atan2(s, c);
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  return add(add(scale(v, cosA), scale(cross(axis, v), sinA)), scale(axis, dot(axis, v) * (1 - cosA)));
+}
+
+/** How "down" points when the phone is held at a typical reading angle. */
+export const REST_DOWN = normalize(vec3(0, -0.8, -0.6));
+/** Direction to the room's lamp at that pose: above and in front of the screen. */
+export const REST_LAMP = normalize(vec3(0.12, 0.5, 1));
+
+/**
+ * Direction towards a lamp fixed in the room, in the screen frame, given
+ * which way is down for the phone right now. The lamp turns with the world,
+ * so tilting the phone changes the angle light comes in at and the box's
+ * walls throw shadows. Turning about the vertical can't be seen from
+ * gravity, so that doesn't move the light.
+ */
+export function lampDirection(down: Vec3): Vec3 {
+  return normalize(rotateByArc(REST_LAMP, REST_DOWN, down));
+}
