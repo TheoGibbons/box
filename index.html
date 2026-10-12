@@ -12,13 +12,86 @@
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>Box</title>
+    <style>
+      /* Inline so the loader (and any load error) shows before the app's CSS arrives. */
+      html, body { margin: 0; background: #121317; font-family: ui-sans-serif, system-ui, sans-serif; }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 14px;
+        background: #121317;
+        color: #9aa0ad;
+        font-size: 14px;
+        z-index: 100;
+        transition: opacity 0.4s;
+      }
+
+      #loading.done {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #loading.error {
+        padding: 24px;
+        text-align: center;
+      }
+
+      #loading.error h1 {
+        color: #eceef3;
+        font-size: 18px;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.12);
+        border-top-color: #ff5d73;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+    <script>
+      // If the app's script can't load at all (missing file, opened from disk),
+      // main.ts never runs, so say so here instead of spinning forever.
+      window.addEventListener(
+        'error',
+        function (e) {
+          var el = document.getElementById('loading');
+          if (!el || !e.target || e.target.tagName !== 'SCRIPT') return;
+          el.classList.add('error');
+          el.innerHTML =
+            '<div><h1>Couldn\u2019t load the app</h1><p>A script failed to load. Check your connection and reload.</p>' +
+            (location.protocol === 'file:' ? '<p>This page needs to be served over http(s), not opened as a file.</p>' : '') +
+            '</div>';
+        },
+        true,
+      );
+    </script>
   </head>
   <body>
     <canvas id="scene" aria-label="3D physics simulation. Drag to tilt, tap to blast objects."></canvas>
     <div id="ui"></div>
     <div id="loading" role="status">
       <div class="spinner" aria-hidden="true"></div>
-      <span>Loading physics…</span>
+      <span class="visually-hidden">Loading…</span>
     </div>
     <noscript>Box needs JavaScript to run.</noscript>
     <script type="module" src="/src/main.ts"></script>
