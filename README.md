@@ -4,6 +4,10 @@ Hundreds of 3D objects in a box that you can tilt, shake and poke in the browser
 
 It's built with TypeScript, [Three.js](https://threejs.org/) for rendering, [Rapier](https://rapier.rs/) (WASM) for physics and Vite. There's no backend.
 
+## Use it
+
+[Use It](https://theogibbons.github.io/box/)
+
 ## Running it
 
 ```sh
