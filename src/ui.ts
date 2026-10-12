@@ -246,6 +246,11 @@ export class UI {
           slider('size', 'Size', (v) => `${v.toFixed(2)}×`),
         ),
         section(
+          'View',
+          slider('depth', 'Box depth', (v) => `${v.toFixed(2)} in`),
+          slider('parallax', 'Parallax', (v) => (v === 0 ? 'off' : `${v.toFixed(2)}×`)),
+        ),
+        section(
           'Look',
           el('div', { class: 'row stack' }, [el('span', { class: 'label' }, ['Palette']), swatches]),
           el('div', { class: 'row stack' }, [el('span', { class: 'label' }, ['Material']), presets]),
@@ -264,7 +269,6 @@ export class UI {
           slider('envIntensity', 'Reflections'),
           toggle('shadows', 'Shadows'),
           toggle('lightFollowsTilt', 'Light follows tilt'),
-          toggle('parallax', 'Parallax'),
         ),
         section(
           'Physics',

@@ -35,7 +35,10 @@ export interface Settings {
   envIntensity: number;
   shadows: boolean;
   lightFollowsTilt: boolean;
-  parallax: boolean;
+  /** Inside depth of the box in (estimated) real-world inches. */
+  depth: number;
+  /** 0 = flat, 1 = physically accurate, >1 exaggerated. */
+  parallax: number;
   backdrop: Backdrop;
   quality: Quality;
   showStats: boolean;
@@ -55,6 +58,8 @@ export const LIMITS = {
   shakeSensitivity: { min: 0, max: 3, step: 0.05 },
   lightIntensity: { min: 0, max: 6, step: 0.05 },
   envIntensity: { min: 0, max: 2, step: 0.05 },
+  depth: { min: 0.3, max: 3, step: 0.05 },
+  parallax: { min: 0, max: 3, step: 0.05 },
 } as const;
 type NumericKey = keyof typeof LIMITS;
 
@@ -82,7 +87,8 @@ export function defaultSettings(mobile: boolean): Settings {
     envIntensity: 0.6,
     shadows: true,
     lightFollowsTilt: true,
-    parallax: true,
+    depth: 1,
+    parallax: 1.5,
     backdrop: 'charcoal',
     quality: 'auto',
     showStats: false,

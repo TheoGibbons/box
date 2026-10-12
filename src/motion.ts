@@ -3,6 +3,7 @@ import {
   deviceToScreen,
   dot,
   gravityFromOrientation,
+  gyroVote,
   length,
   normalize,
   scale,
@@ -29,11 +30,18 @@ export class MotionInput {
   onChange: (s: MotionState) => void = () => {};
   /** Effective gravity in g units, screen frame. */
   readonly gravity: Vec3 = vec3(0, -1, 0);
+  /** Angular velocity in rad/s, screen frame; null until a gyroscope reports. */
+  rotation: Vec3 | null = null;
   invert = false;
 
   private sign: 1 | -1 = 1;
   private votes: number[] = [];
   private signLocked = false;
+  private gyroSign: 1 | -1 = 1;
+  private gyroVotes: number[] = [];
+  private gyroLocked = false;
+  private prevDown: Vec3 | null = null;
+  private prevAt = 0;
   private orientationDown: Vec3 | null = null;
   private orientationAt = 0;
   private lastEventAt = 0;
@@ -128,11 +136,42 @@ export class MotionInput {
     const downSpec = scale(raw, -1 / STANDARD_G); // spec says the phone at rest reads +g "up"
     this.learnSign(downSpec, now);
     const sign = this.sign * (this.invert ? -1 : 1);
-    const screen = deviceToScreen(scale(downSpec, sign), screenAngle());
+    const angle = screenAngle();
+    const down = scale(downSpec, sign);
+    const screen = deviceToScreen(down, angle);
     this.gravity.x = screen.x;
     this.gravity.y = screen.y;
     this.gravity.z = screen.z;
+
+    const r = e.rotationRate;
+    if (r && r.alpha != null && r.beta != null && r.gamma != null) {
+      // Spec: alpha is about z, beta about x, gamma about y, in degrees/s.
+      const omega = scale(vec3(r.beta, r.gamma, r.alpha), Math.PI / 180);
+      this.learnGyroSign(omega, down, now);
+      this.rotation = deviceToScreen(scale(omega, this.gyroSign), angle);
+    }
+    this.prevDown = down;
+    this.prevAt = now;
   };
+
+  /**
+   * Like the accelerometer, gyroscope sign conventions have varied between
+   * browsers. While the phone turns without much shaking, check the reported
+   * rotation against how gravity actually moved.
+   */
+  private learnGyroSign(omega: Vec3, down: Vec3, now: number): void {
+    if (this.gyroLocked || !this.prevDown) return;
+    const mag = length(down);
+    if (mag < 0.9 || mag > 1.1 || Math.abs(length(this.prevDown) - 1) > 0.1) return;
+    const vote = gyroVote(omega, normalize(this.prevDown), normalize(down), (now - this.prevAt) / 1000);
+    if (vote === null) return;
+    this.gyroVotes.push(vote);
+    const decided = decideMotionSign(this.gyroVotes, 12);
+    if (decided || this.gyroVotes.length >= 80) {
+      if (decided) this.gyroSign = decided;
+      this.gyroLocked = true;
+    }
+  }
 
   /**
    * Some browsers have historically reported the opposite sign. While the

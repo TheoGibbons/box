@@ -8,14 +8,11 @@ import { normalize, scale, type Vec3, vec3 } from './math';
 export type QualityLevel = 'low' | 'medium' | 'high';
 
 const BACKDROPS: Record<Backdrop, { wall: string; bg: string; rim: string }> = {
-  charcoal: { wall: '#2a2c33', bg: '#121317', rim: '#4a4d57' },
-  navy: { wall: '#1d2b4a', bg: '#0b1222', rim: '#3a4d78' },
+  charcoal: { wall: '#3a3d46', bg: '#121317', rim: '#5a5e6a' },
+  navy: { wall: '#283960', bg: '#0b1222', rim: '#4a5f90' },
   paper: { wall: '#e9e5dc', bg: '#cfcac0', rim: '#bdb7aa' },
 };
 
-const FOV = 38;
-/** How much bigger than the viewport the front rim is drawn, leaving room for parallax. */
-const OVERSCAN = 1.06;
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -28,12 +25,12 @@ export class Renderer {
   private rim: THREE.LineSegments;
   private key: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
+  private fill: THREE.PointLight;
   private box = { w: 1, h: 1, d: 1 };
   private quality: QualityLevel = 'high';
   private shadowsWanted = true;
   private syncedVersion = -1;
   private colorKey = '';
-  private parallax = vec3();
   private matrix = new THREE.Matrix4();
   private pos = new THREE.Vector3();
   private quat = new THREE.Quaternion();
@@ -48,7 +45,8 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
-    this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 400);
+    // The projection is replaced every frame by updateCamera's off-axis frustum.
+    this.camera = new THREE.PerspectiveCamera(40, 1, 0.5, 400);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -63,12 +61,18 @@ export class Renderer {
 
     this.rim = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
-      new THREE.LineBasicMaterial({ transparent: true, opacity: 0.35 }),
+      new THREE.LineBasicMaterial({ transparent: true, opacity: 0.6 }),
     );
     this.scene.add(this.rim);
 
-    this.hemi = new THREE.HemisphereLight(0xffffff, 0x404050, 0.35);
+    // Fills the side walls, which the key light (from the viewer's side) barely reaches.
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x9a9ab0, 0.9);
     this.scene.add(this.hemi);
+
+    // Light coming in through the "window": lights the side walls, which the
+    // key light only grazes, and falls off into the corners like a real box.
+    this.fill = new THREE.PointLight(0xffffff, 1, 0, 0);
+    this.scene.add(this.fill);
 
     this.key = new THREE.DirectionalLight(0xffffff, 2.6);
     this.key.castShadow = true;
@@ -81,8 +85,6 @@ export class Renderer {
 
   setSize(width: number, height: number): void {
     this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
     this.applyPixelRatio();
   }
 
@@ -90,6 +92,7 @@ export class Renderer {
     this.box = box;
     this.walls.scale.set(box.w, box.h, box.d);
     this.rim.scale.set(box.w, box.h, box.d);
+    this.fill.position.set(0, 0, box.d / 2 + box.d * 0.6);
     const half = Math.max(box.w, box.h, box.d) * 0.75;
     const cam = this.key.shadow.camera;
     cam.left = cam.bottom = -half;
@@ -118,7 +121,8 @@ export class Renderer {
     this.material.clearcoat = s.clearcoat;
     this.material.clearcoatRoughness = 0.1;
     this.key.intensity = s.lightIntensity;
-    this.hemi.intensity = 0.15 + s.lightIntensity * 0.08;
+    this.hemi.intensity = 0.3 + s.lightIntensity * 0.1;
+    this.fill.intensity = 0.4 + s.lightIntensity * 0.35;
     this.scene.environmentIntensity = s.envIntensity;
     this.shadowsWanted = s.shadows;
     this.applyShadows();
@@ -134,19 +138,37 @@ export class Renderer {
   }
 
   /**
-   * Places the camera so the box's open front fills the viewport. `tilt` is
-   * the gravity direction; with parallax on, the camera leans against it so
-   * the box feels like a physical object.
+   * Treats the screen as a window onto the box: the box's open front sits
+   * exactly on the screen rectangle and the camera sits at the viewer's eye,
+   * with an off-axis frustum through the screen's edges. As the eye moves,
+   * the opening stays glued to the bezel while the inside shifts behind it.
+   *
+   * `eye` is the unit direction from the screen centre to the viewer,
+   * `distance` the viewing distance in world units, and `strength` scales the
+   * sideways offset (1 = physically accurate).
    */
-  updateCamera(tilt: Vec3, parallax: boolean, dt: number): void {
-    const { h, d } = this.box;
-    const dist = (h / 2 / OVERSCAN) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    const target = parallax ? vec3(-tilt.x * 1.1, -tilt.y * 0.8, 0) : vec3();
-    const k = 1 - Math.exp(-dt / 0.12);
-    this.parallax.x += (target.x - this.parallax.x) * k;
-    this.parallax.y += (target.y - this.parallax.y) * k;
-    this.camera.position.set(this.parallax.x, this.parallax.y, d / 2 + dist);
-    this.camera.lookAt(this.parallax.x * 0.4, this.parallax.y * 0.4, -d / 2);
+  updateCamera(eye: Vec3, distance: number, strength: number): void {
+    const { w, h, d } = this.box;
+    const screenZ = d / 2;
+    const ez = Math.max(0.2, eye.z);
+    const ex = (eye.x / ez) * distance * strength;
+    const ey = (eye.y / ez) * distance * strength;
+    this.camera.position.set(ex, ey, screenZ + distance);
+    this.camera.quaternion.identity();
+    this.camera.updateMatrixWorld();
+    const near = distance * 0.5;
+    const k = near / distance;
+    this.camera.near = near;
+    this.camera.far = distance + d + 50;
+    this.camera.projectionMatrix.makePerspective(
+      (-w / 2 - ex) * k,
+      (w / 2 - ex) * k,
+      (h / 2 - ey) * k,
+      (-h / 2 - ey) * k,
+      near,
+      this.camera.far,
+    );
+    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
   }
 
   /** Points the key light. With follow-tilt the light stays put in the "real" world as the box turns. */

@@ -135,3 +135,20 @@ export function rng(seed: number): () => number {
 
 /** Exponential smoothing factor for a time constant, independent of frame rate. */
 export const smoothing = (dt: number, tau: number): number => (tau <= 0 ? 1 : 1 - Math.exp(-dt / tau));
+
+export const cross = (a: Vec3, b: Vec3): Vec3 =>
+  vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+
+/**
+ * Checks a gyroscope reading against how gravity actually moved. For a
+ * world-fixed vector seen from a rotating device, d(g)/dt = -omega × g.
+ * Returns the cosine between predicted and observed change, or null when the
+ * motion is too small to judge. `omega` is rad/s; `gPrev`/`gNow` are unit-ish.
+ */
+export function gyroVote(omega: Vec3, gPrev: Vec3, gNow: Vec3, dt: number): number | null {
+  if (length(omega) < 0.6 || dt <= 0 || dt > 0.1) return null;
+  const predicted = scale(cross(omega, gPrev), -dt);
+  const observed = sub(gNow, gPrev);
+  if (length(predicted) < 0.01 || length(observed) < 0.01) return null;
+  return dot(normalize(predicted), normalize(observed));
+}

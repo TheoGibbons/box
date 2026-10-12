@@ -6,6 +6,7 @@ import { Renderer, type QualityLevel } from './renderer';
 import { MotionInput, type MotionState } from './motion';
 import { attachPointer, HeldKeys, isTyping } from './input';
 import { UI } from './ui';
+import { Viewpoint } from './viewpoint';
 import {
   defaultSettings,
   loadSettings,
@@ -30,6 +31,14 @@ const REST_TILT = normalize(vec3(0, -0.8, -0.6));
 const DRAG_SENSITIVITY = 0.0065; // radians per CSS pixel
 const KEY_TILT_SPEED = 1.6; // radians per second
 const MAX_SUBSTEPS = 4;
+/** Rough CSS pixels per physical inch; browsers don't expose the real value. */
+const PX_PER_INCH_MOBILE = 150;
+const PX_PER_INCH_DESKTOP = 96;
+/** Typical eye-to-screen distance in inches. */
+const VIEW_INCHES_MOBILE = 12;
+const VIEW_INCHES_DESKTOP = 24;
+/** Keep the box at least this many object-widths deep. */
+const MIN_DEPTH = 2;
 
 async function main(): Promise<void> {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -42,13 +51,24 @@ async function main(): Promise<void> {
   const defaults = defaultSettings(mobile);
   let s: Settings = loadSettings(defaults);
 
-  let box = boxDimensions(innerWidth / innerHeight);
+  const pxPerInch = mobile ? PX_PER_INCH_MOBILE : PX_PER_INCH_DESKTOP;
+  /** World units per real-world inch on this screen. */
+  const unitsPerInch = (h: number) => (pxPerInch * h) / innerHeight;
+  const computeBox = () => {
+    const { w, h } = boxDimensions(innerWidth / innerHeight);
+    return { w, h, d: Math.max(MIN_DEPTH, s.depth * unitsPerInch(h)) };
+  };
+  const viewDistance = () => (mobile ? VIEW_INCHES_MOBILE : VIEW_INCHES_DESKTOP) * unitsPerInch(box.h);
+
+  let box = computeBox();
   const sim = new Sim(RAPIER, box);
   const view = new Renderer(canvas);
   view.setBox(box);
   view.setSize(innerWidth, innerHeight);
 
   const motion = new MotionInput();
+  const viewpoint = new Viewpoint();
+  let pointerAt: { x: number; y: number } | null = null;
   const keys = new HeldKeys();
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -121,6 +141,9 @@ async function main(): Promise<void> {
           case 'invertMotion':
             motion.invert = s.invertMotion;
             break;
+          case 'depth':
+            resizeBox();
+            break;
           case 'keepAwake':
             void updateWakeLock();
             break;
@@ -155,6 +178,12 @@ async function main(): Promise<void> {
   );
 
   // ---- actions --------------------------------------------------------------
+
+  function resizeBox(): void {
+    box = computeBox();
+    sim.setBox(box);
+    view.setBox(box);
+  }
 
   function respawn(): void {
     sim.respawn(s.count, s.shape, s.size);
@@ -297,7 +326,16 @@ async function main(): Promise<void> {
     }
   });
 
-  motion.onChange = (state) => ui.setMotion(state);
+  // On desktop the mouse stands in for the viewer's head.
+  window.addEventListener('pointermove', (e) => {
+    pointerAt = e.pointerType === 'mouse' ? { x: e.clientX, y: e.clientY } : null;
+  });
+  document.documentElement.addEventListener('pointerleave', () => (pointerAt = null));
+
+  motion.onChange = (state) => {
+    if (state === 'on') viewpoint.reset();
+    ui.setMotion(state);
+  };
   ui.setMotion(motion.state);
 
   let resizeTimer = 0;
@@ -305,9 +343,7 @@ async function main(): Promise<void> {
     view.setSize(innerWidth, innerHeight);
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
-      box = boxDimensions(innerWidth / innerHeight);
-      sim.setBox(box);
-      view.setBox(box);
+      resizeBox();
     }, 120);
   });
 
@@ -375,12 +411,23 @@ async function main(): Promise<void> {
     }
     const alpha = paused ? 1 : clamp(acc / STEP, 0, 1);
 
-    const dir = normalize(gravity);
-    view.updateCamera(vec3(dir.x, dir.y - REST_TILT.y, 0), s.parallax, dt);
+    updateViewpoint(dt);
+    view.updateCamera(viewpoint.eye, viewDistance(), s.parallax);
     view.updateLight(gravity, s.lightFollowsTilt);
     view.render(sim, s.palette, alpha);
 
     measure(now);
+  }
+
+  function updateViewpoint(dt: number): void {
+    if (motion.active && !motion.isStale()) {
+      if (motion.rotation) viewpoint.rotate(motion.rotation, dt);
+      else viewpoint.fromGravity(motion.gravity, dt);
+    } else if (pointerAt) {
+      viewpoint.fromPointer((pointerAt.x / innerWidth) * 2 - 1, (pointerAt.y / innerHeight) * 2 - 1, dt);
+    } else {
+      viewpoint.center(dt);
+    }
   }
 
   function measure(now: number): void {
