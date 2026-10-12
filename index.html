@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#121317" />
+    <meta name="description" content="Tilt, shake and poke hundreds of 3D objects in a box. Works with your phone's motion sensors." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>Box</title>
+  </head>
+  <body>
+    <canvas id="scene" aria-label="3D physics simulation. Drag to tilt, tap to blast objects."></canvas>
+    <div id="ui"></div>
+    <div id="loading" role="status">
+      <div class="spinner" aria-hidden="true"></div>
+      <span>Loading physics…</span>
+    </div>
+    <noscript>Box needs JavaScript to run.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
