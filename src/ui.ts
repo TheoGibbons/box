@@ -257,6 +257,10 @@ export class UI {
           slider('roughness', 'Roughness'),
           slider('metalness', 'Metalness'),
           slider('clearcoat', 'Clearcoat'),
+          segmented('walls', 'Walls', [
+            ['plain', 'Plain'],
+            ['checker', 'Checker'],
+          ]),
           segmented('backdrop', 'Box', [
             ['charcoal', 'Charcoal'],
             ['navy', 'Navy'],

@@ -5,6 +5,7 @@ export type ShapeKind = (typeof SHAPE_KINDS)[number];
 export type ShapeMode = 'mixed' | ShapeKind;
 export type Quality = 'auto' | 'low' | 'medium' | 'high';
 export type Backdrop = 'charcoal' | 'navy' | 'paper';
+export type WallPattern = 'plain' | 'checker';
 
 export const PALETTES = {
   candy: ['#ff5d73', '#ffb347', '#ffe066', '#7bd389', '#4cc9f0', '#9b5de5', '#f15bb5'],
@@ -40,6 +41,7 @@ export interface Settings {
   /** 0 = flat, 1 = physically accurate, >1 exaggerated. */
   parallax: number;
   backdrop: Backdrop;
+  walls: WallPattern;
   quality: Quality;
   showStats: boolean;
   invertMotion: boolean;
@@ -90,6 +92,7 @@ export function defaultSettings(mobile: boolean): Settings {
     depth: 1,
     parallax: 1.5,
     backdrop: 'charcoal',
+    walls: 'plain',
     quality: 'auto',
     showStats: false,
     invertMotion: false,
@@ -102,6 +105,7 @@ const ENUMS: Partial<Record<keyof Settings, readonly string[]>> = {
   palette: PALETTE_IDS,
   quality: ['auto', 'low', 'medium', 'high'],
   backdrop: ['charcoal', 'navy', 'paper'],
+  walls: ['plain', 'checker'],
 };
 
 /** Merges untrusted input (localStorage, URL) over defaults, dropping anything invalid. */

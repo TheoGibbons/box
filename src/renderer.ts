@@ -22,6 +22,7 @@ export class Renderer {
   private meshes = {} as Record<ShapeKind, THREE.InstancedMesh>;
   private walls: THREE.Mesh;
   private wallMaterial: THREE.MeshStandardMaterial;
+  private checker: THREE.Texture;
   private rim: THREE.LineSegments;
   private key: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
@@ -56,6 +57,7 @@ export class Renderer {
 
     this.wallMaterial = new THREE.MeshStandardMaterial({ side: THREE.BackSide, roughness: 0.92, metalness: 0 });
     this.walls = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), this.wallMaterial);
+    this.checker = createCheckerTexture(this.renderer.capabilities.getMaxAnisotropy());
     this.walls.receiveShadow = true;
     this.scene.add(this.walls);
 
@@ -90,7 +92,8 @@ export class Renderer {
 
   setBox(box: { w: number; h: number; d: number }): void {
     this.box = box;
-    this.walls.scale.set(box.w, box.h, box.d);
+    this.walls.geometry.dispose();
+    this.walls.geometry = createWallGeometry(box.w, box.h, box.d);
     this.rim.scale.set(box.w, box.h, box.d);
     this.fill.position.set(0, 0, box.d / 2 + box.d * 0.6);
     const half = Math.max(box.w, box.h, box.d) * 0.75;
@@ -128,6 +131,11 @@ export class Renderer {
     this.applyShadows();
     const bd = BACKDROPS[s.backdrop];
     this.wallMaterial.color.set(bd.wall);
+    const map = s.walls === 'checker' ? this.checker : null;
+    if (this.wallMaterial.map !== map) {
+      this.wallMaterial.map = map;
+      this.wallMaterial.needsUpdate = true;
+    }
     (this.rim.material as THREE.LineBasicMaterial).color.set(bd.rim);
     this.scene.background = new THREE.Color(bd.bg);
     const key = `${s.palette}`;
@@ -278,4 +286,52 @@ function pickColor(out: THREE.Color, colors: string[], seed: number): THREE.Colo
   // A little per-object variation keeps big piles from looking flat.
   const jitter = ((seed * 9301 + 49297) % 1) - 0.5;
   return out.offsetHSL(0, 0, jitter * 0.06);
+}
+
+/** Target size of one checker square, in world units (about two objects across). */
+const CHECKER_TILE = 2.2;
+
+/**
+ * The inside of the box (front face culled by BackSide), with UVs in world
+ * units so checker squares are square on every wall whatever the box's
+ * shape. Squares are fitted to divide the depth exactly, so the side walls
+ * get clean rows from the glass to the back.
+ */
+function createWallGeometry(w: number, h: number, d: number): THREE.BufferGeometry {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const tile = d / Math.max(1, Math.round(d / CHECKER_TILE));
+  const period = tile * 2; // the texture holds 2×2 squares
+  const pos = geo.attributes.position;
+  const normal = geo.attributes.normal;
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i) + d / 2; // depth measured from the back wall
+    const nx = Math.abs(normal.getX(i));
+    const ny = Math.abs(normal.getY(i));
+    if (nx > 0.5) uv.setXY(i, z / period, y / period);
+    else if (ny > 0.5) uv.setXY(i, x / period, z / period);
+    else uv.setXY(i, x / period, y / period);
+  }
+  uv.needsUpdate = true;
+  return geo;
+}
+
+/** A 2×2 checker that tints the wall colour: full strength and a darker shade. */
+function createCheckerTexture(anisotropy: number): THREE.Texture {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#8c8c8c';
+  ctx.fillRect(0, 0, size / 2, size / 2);
+  ctx.fillRect(size / 2, size / 2, size / 2, size / 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = anisotropy;
+  return tex;
 }

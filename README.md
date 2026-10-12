@@ -38,7 +38,7 @@ The settings are saved to localStorage:
 
 - **Objects:** count (100–900), shape (mixed, cubes, balls, pills or pucks), size.
 - **View:** box depth in inches (default 1"), parallax strength (1× is physically accurate; the default is 1.5×).
-- **Look:** 8 palettes, material presets (plastic, glossy, matte, metal, rubber), roughness, metalness, clearcoat and box colour.
+- **Look:** 8 palettes, material presets (plastic, glossy, matte, metal, rubber), roughness, metalness, clearcoat, plain or checkerboard walls, and box colour.
 - **Lighting:** key light, environment reflections, shadows, light-follows-tilt, parallax.
 - **Physics:** gravity, bounciness, friction, and a boost for how strongly shakes from the motion sensor come through.
 - **Device:** quality (auto, low, medium or high), invert motion, keep screen awake, stats overlay.
