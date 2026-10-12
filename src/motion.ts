@@ -3,7 +3,11 @@ import {
   deviceToScreen,
   dot,
   gravityFromOrientation,
+  decideGyroMapping,
+  GYRO_MAPPINGS,
+  gyroToOmega,
   gyroVote,
+  type GyroMapping,
   length,
   normalize,
   scale,
@@ -38,7 +42,8 @@ export class MotionInput {
   private votes: number[] = [];
   private signLocked = false;
   private gyroSign: 1 | -1 = 1;
-  private gyroVotes: number[] = [];
+  private gyroMapping: GyroMapping;
+  private gyroVotes: Record<GyroMapping, number[]> = { spec: [], webkit: [] };
   private gyroLocked = false;
   private prevDown: Vec3 | null = null;
   private prevAt = 0;
@@ -53,6 +58,9 @@ export class MotionInput {
     else if (!window.isSecureContext) this.state = 'insecure';
     else if (typeof DM.requestPermission === 'function') this.state = 'needs-permission';
     else this.state = 'off';
+    // Only iOS has requestPermission, and iOS uses WebKit's rotationRate layout.
+    // Readings confirm or correct this guess once the phone moves.
+    this.gyroMapping = this.state === 'needs-permission' ? 'webkit' : 'spec';
   }
 
   get active(): boolean {
@@ -145,9 +153,9 @@ export class MotionInput {
 
     const r = e.rotationRate;
     if (r && r.alpha != null && r.beta != null && r.gamma != null) {
-      // Spec: alpha is about z, beta about x, gamma about y, in degrees/s.
-      const omega = scale(vec3(r.beta, r.gamma, r.alpha), Math.PI / 180);
-      this.learnGyroSign(omega, down, now);
+      const rate = { alpha: r.alpha, beta: r.beta, gamma: r.gamma };
+      this.learnGyroMapping(rate, down, now);
+      const omega = gyroToOmega(rate, this.gyroMapping);
       this.rotation = deviceToScreen(scale(omega, this.gyroSign), angle);
     }
     this.prevDown = down;
@@ -155,21 +163,29 @@ export class MotionInput {
   };
 
   /**
-   * Like the accelerometer, gyroscope sign conventions have varied between
-   * browsers. While the phone turns without much shaking, check the reported
-   * rotation against how gravity actually moved.
+   * Browsers disagree on which rotationRate field holds which axis (and,
+   * historically, on sign). While the phone turns without much shaking,
+   * score each layout by how well it predicts the change in gravity, and
+   * lock in the one that clearly wins.
    */
-  private learnGyroSign(omega: Vec3, down: Vec3, now: number): void {
+  private learnGyroMapping(rate: { alpha: number; beta: number; gamma: number }, down: Vec3, now: number): void {
     if (this.gyroLocked || !this.prevDown) return;
     const mag = length(down);
     if (mag < 0.9 || mag > 1.1 || Math.abs(length(this.prevDown) - 1) > 0.1) return;
-    const vote = gyroVote(omega, normalize(this.prevDown), normalize(down), (now - this.prevAt) / 1000);
-    if (vote === null) return;
-    this.gyroVotes.push(vote);
-    const decided = decideMotionSign(this.gyroVotes, 12);
-    if (decided || this.gyroVotes.length >= 80) {
-      if (decided) this.gyroSign = decided;
+    const dt = (now - this.prevAt) / 1000;
+    const gPrev = normalize(this.prevDown);
+    const gNow = normalize(down);
+    for (const m of GYRO_MAPPINGS) {
+      const vote = gyroVote(gyroToOmega(rate, m), gPrev, gNow, dt);
+      if (vote !== null) this.gyroVotes[m].push(vote);
+    }
+    const decided = decideGyroMapping(this.gyroVotes);
+    if (decided) {
+      this.gyroMapping = decided.mapping;
+      this.gyroSign = decided.sign;
       this.gyroLocked = true;
+    } else if (this.gyroVotes.spec.length + this.gyroVotes.webkit.length > 400) {
+      this.gyroLocked = true; // inconclusive; keep the platform default
     }
   }
 

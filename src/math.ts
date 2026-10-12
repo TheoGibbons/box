@@ -152,3 +152,38 @@ export function gyroVote(omega: Vec3, gPrev: Vec3, gNow: Vec3, dt: number): numb
   if (length(predicted) < 0.01 || length(observed) < 0.01) return null;
   return dot(normalize(predicted), normalize(observed));
 }
+
+/**
+ * How a browser lays out DeviceMotionEvent.rotationRate. The spec puts the
+ * rate about z in `alpha`, x in `beta` and y in `gamma`; WebKit on iOS
+ * reports the gyroscope's x/y/z as alpha/beta/gamma instead.
+ */
+export type GyroMapping = 'spec' | 'webkit';
+export const GYRO_MAPPINGS: GyroMapping[] = ['spec', 'webkit'];
+
+/** Converts rotationRate (deg/s) to angular velocity (rad/s) about device x/y/z. */
+export function gyroToOmega(r: { alpha: number; beta: number; gamma: number }, mapping: GyroMapping): Vec3 {
+  const k = Math.PI / 180;
+  return mapping === 'spec' ? vec3(r.beta * k, r.gamma * k, r.alpha * k) : vec3(r.alpha * k, r.beta * k, r.gamma * k);
+}
+
+/**
+ * Picks the rotationRate layout and sign whose predictions best match how
+ * gravity actually moved. `votes` holds gyroVote results per mapping; the
+ * right mapping scores near +1 (or -1 if its sign is flipped) and the wrong
+ * one hovers near 0. Returns null until one clearly wins.
+ */
+export function decideGyroMapping(
+  votes: Record<GyroMapping, number[]>,
+  minVotes = 15,
+): { mapping: GyroMapping; sign: 1 | -1 } | null {
+  const scored = GYRO_MAPPINGS.map((mapping) => {
+    const v = votes[mapping];
+    const mean = v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    return { mapping, n: v.length, mean };
+  }).sort((a, b) => Math.abs(b.mean) - Math.abs(a.mean));
+  const [best, other] = scored;
+  if (best.n < minVotes || Math.abs(best.mean) < 0.6) return null;
+  if (other.n >= minVotes / 2 && Math.abs(other.mean) > Math.abs(best.mean) - 0.3) return null;
+  return { mapping: best.mapping, sign: best.mean > 0 ? 1 : -1 };
+}
