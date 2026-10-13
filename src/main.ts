@@ -83,7 +83,7 @@ async function main(): Promise<void> {
   let tiltDir: Vec3 = { ...REST_TILT };
   let gravity: Vec3 = scale(tiltDir, s.gravity);
   let motionSmooth: Vec3 = vec3(0, -1, 0);
-  /** Which way is down for the phone, smoothed so shakes don't flicker the lighting. */
+  /** Which way is down for the lighting, optionally smoothed to reduce flicker. */
   let pose: Vec3 = { ...REST_TILT };
   let paused = false;
   let acc = 0;
@@ -476,8 +476,11 @@ async function main(): Promise<void> {
 
     updateViewpoint(dt);
     view.updateCamera(viewpoint.eye, viewDistance(), s.parallax);
-    const poseTarget = motion.active && !motion.isStale() ? motionSmooth : tiltDir;
-    pose = normalize(lerpVec(pose, normalize(poseTarget), smoothing(dt, 0.15)));
+    const motionPose = s.smoothShadows ? motionSmooth : motion.gravity;
+    const poseTarget = motion.active && !motion.isStale() ? motionPose : tiltDir;
+    pose = s.smoothShadows
+      ? normalize(lerpVec(pose, normalize(poseTarget), smoothing(dt, 0.15)))
+      : normalize(poseTarget);
     view.updateLight(pose, s.lightFollowsTilt);
     view.render(sim, s.palette, alpha);
 

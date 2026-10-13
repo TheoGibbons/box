@@ -38,6 +38,8 @@ export interface Settings {
   envIntensity: number;
   shadows: boolean;
   lightFollowsTilt: boolean;
+  /** Ease lighting changes instead of following tilt immediately. */
+  smoothShadows: boolean;
   /** Inside depth of the box in (estimated) real-world inches. */
   depth: number;
   /** 0 = flat, 1 = physically accurate, >1 exaggerated. */
@@ -97,6 +99,7 @@ export function defaultSettings(mobile: boolean): Settings {
     envIntensity: 0.6,
     shadows: true,
     lightFollowsTilt: true,
+    smoothShadows: false,
     depth: 1,
     parallax: 1.5,
     backdrop: 'charcoal',

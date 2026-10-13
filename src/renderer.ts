@@ -192,7 +192,7 @@ export class Renderer {
    * Points the key light at the box from a lamp in front of the phone. With
    * follow-tilt the lamp stays put in the room, so tilting the phone changes
    * the angle the light comes in at and the walls throw shadows inside.
-   * `down` is the phone's (smoothed) gravity direction.
+   * `down` is the phone's gravity direction, optionally smoothed by the caller.
    */
   updateLight(down: Vec3, follow: boolean): void {
     const dir = lampDirection(follow ? down : REST_DOWN);

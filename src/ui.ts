@@ -287,6 +287,7 @@ export class UI {
           slider('envIntensity', 'Reflections'),
           toggle('shadows', 'Shadows'),
           toggle('lightFollowsTilt', 'Light follows tilt'),
+          toggle('smoothShadows', 'Smooth shadow movement'),
         ),
         section(
           'Physics',
