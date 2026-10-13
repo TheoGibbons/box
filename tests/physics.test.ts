@@ -62,7 +62,7 @@ describe('Sim', () => {
     const sim = new Sim(RAPIER, box);
     sim.respawn(400, 'mixed', 1.2);
     for (let i = 0; i < 60; i++) sim.step();
-    sim.shake(3);
+    sim.shake(10);
     const hit = sim.raycast(vec3(0, 0, 50), vec3(0, 0, -1));
     expect(hit).not.toBeNull();
     sim.blast(hit!, 6, 3);

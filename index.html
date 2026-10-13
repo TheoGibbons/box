@@ -89,6 +89,14 @@
   <body>
     <canvas id="scene" aria-label="3D physics simulation. Drag to tilt, tap to blast objects."></canvas>
     <div id="ui"></div>
+    <div id="portrait-guard" role="status" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="7" y="2" width="10" height="20" rx="2" />
+        <path d="M11 18h2" />
+      </svg>
+      <h1>Turn your phone upright</h1>
+      <p>Box runs in portrait. Tilt and shake to move the objects.</p>
+    </div>
     <div id="loading" role="status">
       <div class="spinner" aria-hidden="true"></div>
       <span class="visually-hidden">Loading…</span>

@@ -1,6 +1,6 @@
 // Offline support: pages are network-first so updates land straight away;
 // everything else (hashed assets, icons) is cache-first.
-const CACHE = 'box-v1';
+const CACHE = 'box-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 

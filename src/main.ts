@@ -4,6 +4,7 @@ import './style.css';
 import { Sim, STEP } from './physics';
 import { Renderer, type QualityLevel } from './renderer';
 import { MotionInput, type MotionState } from './motion';
+import { PortraitMode } from './portrait';
 import { attachPointer, HeldKeys, isTyping } from './input';
 import { UI } from './ui';
 import { Viewpoint } from './viewpoint';
@@ -44,18 +45,24 @@ async function main(): Promise<void> {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui') as HTMLElement;
   const loading = document.getElementById('loading') as HTMLElement;
+  const mobile = matchMedia('(pointer: coarse)').matches;
+  const portrait = new PortraitMode(mobile, document.getElementById('portrait-guard') as HTMLElement, [canvas, uiRoot]);
 
   await RAPIER.init();
 
-  const mobile = matchMedia('(pointer: coarse)').matches;
   const defaults = defaultSettings(mobile);
   let s: Settings = loadSettings(defaults);
 
   const pxPerInch = mobile ? PX_PER_INCH_MOBILE : PX_PER_INCH_DESKTOP;
+  const viewport = () =>
+    portrait.blocked
+      ? { width: Math.min(innerWidth, innerHeight), height: Math.max(innerWidth, innerHeight) }
+      : { width: innerWidth, height: innerHeight };
   /** World units per real-world inch on this screen. */
-  const unitsPerInch = (h: number) => (pxPerInch * h) / innerHeight;
+  const unitsPerInch = (h: number) => (pxPerInch * h) / viewport().height;
   const computeBox = () => {
-    const { w, h } = boxDimensions(innerWidth / innerHeight);
+    const { width, height } = viewport();
+    const { w, h } = boxDimensions(width / height);
     return { w, h, d: Math.max(MIN_DEPTH, s.depth * unitsPerInch(h)) };
   };
   const viewDistance = () => (mobile ? VIEW_INCHES_MOBILE : VIEW_INCHES_DESKTOP) * unitsPerInch(box.h);
@@ -64,7 +71,7 @@ async function main(): Promise<void> {
   const sim = new Sim(RAPIER, box);
   const view = new Renderer(canvas);
   view.setBox(box);
-  view.setSize(innerWidth, innerHeight);
+  view.setSize(viewport().width, viewport().height);
 
   const motion = new MotionInput();
   const viewpoint = new Viewpoint();
@@ -192,9 +199,9 @@ async function main(): Promise<void> {
     quietUntil = performance.now() + 3000;
   }
 
-  function shake(): void {
+  function shake(strength = 10): void {
     if (paused) setPaused(false);
-    sim.shake(1);
+    sim.shake(strength);
   }
 
   function level(): void {
@@ -221,7 +228,7 @@ async function main(): Promise<void> {
     setMotionPref(true);
     const result = await motion.enable();
     const messages: Partial<Record<MotionState, string>> = {
-      waiting: 'Tilt your phone to move everything',
+      waiting: 'Tilt to move everything · shake to toss it',
       denied: 'Motion access was denied. Allow it in your browser settings and reload.',
       insecure: 'Phone motion needs the page to be served over HTTPS',
       unsupported: 'No motion sensor found on this device',
@@ -321,7 +328,7 @@ async function main(): Promise<void> {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (portrait.blocked || isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     switch (e.key.toLowerCase()) {
       case ' ':
         e.preventDefault();
@@ -366,16 +373,30 @@ async function main(): Promise<void> {
     if (state === 'on') viewpoint.reset();
     ui.setMotion(state);
   };
+  motion.onShake = () => {
+    if (!portrait.blocked && s.shakeSensitivity > 0) shake(s.shakeSensitivity);
+  };
   ui.setMotion(motion.state);
 
   let resizeTimer = 0;
-  window.addEventListener('resize', () => {
-    view.setSize(innerWidth, innerHeight);
+  const resizeViewport = () => {
     clearTimeout(resizeTimer);
+    if (portrait.blocked) return;
+    view.setSize(innerWidth, innerHeight);
     resizeTimer = window.setTimeout(() => {
-      resizeBox();
+      if (!portrait.blocked) resizeBox();
     }, 120);
-  });
+  };
+  window.addEventListener('resize', resizeViewport);
+  portrait.onChange = (blocked) => {
+    resizeViewport();
+    if (!blocked) {
+      last = performance.now();
+      fpsStart = last;
+      fpsFrames = 0;
+      quietUntil = last + 2000;
+    }
+  };
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -409,6 +430,10 @@ async function main(): Promise<void> {
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
+    if (portrait.blocked) {
+      acc = 0;
+      return;
+    }
 
     // Arrow keys tilt like a slow drag.
     if (!motion.active) {

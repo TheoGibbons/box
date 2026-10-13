@@ -14,6 +14,7 @@ import {
   vec3,
   type Vec3,
 } from './math';
+import { ShakeDetector } from './shake';
 
 export type MotionState = 'unsupported' | 'needs-permission' | 'off' | 'waiting' | 'on' | 'denied' | 'insecure';
 
@@ -32,6 +33,7 @@ const STANDARD_G = 9.81;
 export class MotionInput {
   state: MotionState;
   onChange: (s: MotionState) => void = () => {};
+  onShake: () => void = () => {};
   /** Effective gravity in g units, screen frame. */
   readonly gravity: Vec3 = vec3(0, -1, 0);
   /** Angular velocity in rad/s, screen frame; null until a gyroscope reports. */
@@ -51,6 +53,7 @@ export class MotionInput {
   private orientationAt = 0;
   private lastEventAt = 0;
   private waitTimer = 0;
+  private shakeDetector = new ShakeDetector();
 
   constructor() {
     const DM = globalThis.DeviceMotionEvent as unknown as { requestPermission?: PermissionFn } | undefined;
@@ -94,6 +97,7 @@ export class MotionInput {
     }
     window.addEventListener('devicemotion', this.onMotion);
     window.addEventListener('deviceorientation', this.onOrientation);
+    this.shakeDetector.reset();
     this.set('waiting');
     // Desktop browsers often define the API but never deliver readings.
     clearTimeout(this.waitTimer);
@@ -115,6 +119,7 @@ export class MotionInput {
     window.removeEventListener('devicemotion', this.onMotion);
     window.removeEventListener('deviceorientation', this.onOrientation);
     clearTimeout(this.waitTimer);
+    this.shakeDetector.reset();
   }
 
   private set(s: MotionState): MotionState {
@@ -133,7 +138,7 @@ export class MotionInput {
 
   private onMotion = (e: DeviceMotionEvent): void => {
     const a = e.accelerationIncludingGravity;
-    if (!a || a.x == null || a.y == null || a.z == null) return;
+    if (!a || a.x == null || a.y == null || a.z == null || ![a.x, a.y, a.z].every(Number.isFinite)) return;
     const now = performance.now();
     this.lastEventAt = now;
     if (this.state === 'waiting') {
@@ -160,6 +165,7 @@ export class MotionInput {
     }
     this.prevDown = down;
     this.prevAt = now;
+    if (this.shakeDetector.update(a, e.acceleration, now) && document.visibilityState === 'visible') this.onShake();
   };
 
   /**

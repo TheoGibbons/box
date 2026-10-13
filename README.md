@@ -20,6 +20,8 @@ npm run build        # static site in dist/, deploy anywhere (relative paths)
 
 To try it on a phone, run `npm run dev:https`, open the `https://<your-ip>:5173` URL it prints and accept the certificate warning. Phone motion is on by default: Android starts it automatically, and on iPhone the first tap anywhere asks for access. If you turn motion off with the phone button, that choice is remembered.
 
+On phones, Box stays in portrait. The installed app requests portrait in its manifest, and the fullscreen control also attempts a native orientation lock. If the browser cannot lock orientation, turning sideways shows an upright-phone prompt and suspends the simulation until you return to portrait.
+
 ## Controls
 
 | | Desktop | Phone |
@@ -32,6 +34,8 @@ To try it on a phone, run `npm run dev:https`, open the `https://<your-ip>:5173`
 | Pause / respawn / level | <kbd>P</kbd> / <kbd>R</kbd> / <kbd>L</kbd> | toolbar |
 | Motion · fullscreen · hide UI · settings | <kbd>M</kbd> · <kbd>F</kbd> · <kbd>H</kbd> · <kbd>S</kbd> | toolbar |
 | Tuck the toolbar away | the tab under it | the tab under it |
+
+The red shake button and Space use a 10× strength toss. Physical phone shakes use the adjustable Motion shake boost.
 
 ## Settings
 
@@ -51,7 +55,7 @@ On **Auto** quality, the app starts at High on desktop and Medium on phones. It 
 - `src/physics.ts` sets up the Rapier world. It has six thick static walls (the front one is the invisible "glass"), and each object is its own dynamic body. The world steps at a fixed 60 Hz and the renderer interpolates between steps, so motion stays smooth at any refresh rate. Resting bodies sleep, and get woken when gravity changes. New objects are placed only where they don't overlap anything; any that don't fit yet are queued and pour in as space frees up.
 - `src/viewpoint.ts` estimates where your eye is relative to the screen. On phones, it integrates the gyroscope and slowly re-centres, like iOS parallax wallpapers, so only movement shows parallax. Phones without a gyroscope fall back to gravity, and desktop uses the mouse. The renderer then builds an off-axis frustum from the eye through the screen's edges, which makes the screen behave like a window. Physical sizes use an estimated 150 CSS px per inch on phones and 96 on desktop, with a viewing distance of 12" or 24".
 - `src/renderer.ts` draws one `InstancedMesh` per shape, all sharing a single `MeshPhysicalMaterial` with per-instance colours. The key light is a lamp fixed in the room, above and in front of the phone (`lampDirection` in `src/math.ts`). Tilting the phone changes the angle it shines into the box, and the walls cast shadows onto the objects and onto each other. Room-environment reflections come from PMREM.
-- `src/motion.ts` treats `-accelerationIncludingGravity` as the effective gravity felt inside a box held by the phone, which covers both tilt and shakes. It also rotates readings for landscape screens, and checks the reading's sign against `DeviceOrientationEvent` because some browsers have historically reported it inverted.
+- `src/motion.ts` treats `-accelerationIncludingGravity` as the effective gravity felt inside a box held by the phone, which covers both tilt and shakes. It also rotates readings into the screen frame, and checks the reading's sign against `DeviceOrientationEvent` because some browsers have historically reported it inverted. `src/shake.ts` recognises strong back-and-forth acceleration and triggers the same toss as the shake button, scaled by Motion shake boost (zero disables it). It uses gravity-free acceleration when available, filters gravity out otherwise, and limits repeated tosses with an 800 ms cooldown.
 - `src/math.ts` holds the pure maths (frames, drag-to-tilt, box sizing). Like the settings validation, it's covered by the tests in `tests/`.
 
 ## Deploying
