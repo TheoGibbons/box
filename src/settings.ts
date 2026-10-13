@@ -31,6 +31,8 @@ export interface Settings {
   gravity: number;
   bounciness: number;
   friction: number;
+  /** Multiplier for button, keyboard and phone-triggered tosses. */
+  shakeStrength: number;
   shakeSensitivity: number;
   lightIntensity: number;
   envIntensity: number;
@@ -61,6 +63,7 @@ export const LIMITS = {
   gravity: { min: 5, max: 120, step: 1 },
   bounciness: { min: 0, max: 0.95, step: 0.01 },
   friction: { min: 0, max: 1.5, step: 0.01 },
+  shakeStrength: { min: 0, max: 2, step: 0.05 },
   shakeSensitivity: { min: 0, max: 3, step: 0.05 },
   lightIntensity: { min: 0, max: 6, step: 0.05 },
   envIntensity: { min: 0, max: 2, step: 0.05 },
@@ -84,10 +87,11 @@ export function defaultSettings(mobile: boolean): Settings {
     shape: 'mixed',
     size: 1,
     palette: 'candy',
-    ...MATERIAL_PRESETS.plastic,
+    ...MATERIAL_PRESETS.metal,
     gravity: 40,
     bounciness: 0.25,
     friction: 0.6,
+    shakeStrength: 0.5,
     shakeSensitivity: 1,
     lightIntensity: 2.6,
     envIntensity: 0.6,
@@ -96,7 +100,7 @@ export function defaultSettings(mobile: boolean): Settings {
     depth: 1,
     parallax: 1.5,
     backdrop: 'charcoal',
-    walls: 'plain',
+    walls: 'checker',
     quality: 'auto',
     showStats: false,
     invertMotion: false,

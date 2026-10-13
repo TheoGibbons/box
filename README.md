@@ -35,7 +35,7 @@ On phones, Box stays in portrait. The installed app requests portrait in its man
 | Motion · fullscreen · hide UI · settings | <kbd>M</kbd> · <kbd>F</kbd> · <kbd>H</kbd> · <kbd>S</kbd> | toolbar |
 | Tuck the toolbar away | the tab under it | the tab under it |
 
-The red shake button and Space use a 10× strength toss. Physical phone shakes use the adjustable Motion shake boost.
+The red shake button and Space use a 5× strength toss by default. **Shake strength** in Physics scales button, keyboard and phone-triggered tosses from 0–200%, defaulting to 50%. Physical phone shakes also use the adjustable Motion shake boost.
 
 ## Settings
 
@@ -43,9 +43,9 @@ The settings are saved to localStorage:
 
 - **Objects:** count (100–900), shape (mixed, cubes, balls, pills or pucks), size.
 - **View:** box depth in inches (default 1"), parallax strength (1× is physically accurate; the default is 1.5×).
-- **Look:** 8 palettes, material presets (plastic, glossy, matte, metal, rubber), roughness, metalness, clearcoat, plain or checkerboard walls, and box colour.
+- **Look:** 8 palettes, material presets (plastic, glossy, matte, metal, rubber), roughness, metalness, clearcoat, plain or checkerboard walls, and box colour. Metal and checkerboard walls are the defaults.
 - **Lighting:** key light, environment reflections, shadows, light-follows-tilt, parallax.
-- **Physics:** gravity, bounciness, friction, and a boost for how strongly shakes from the motion sensor come through.
+- **Physics:** gravity, bounciness, friction, shake strength (50% by default; zero disables tosses), and a boost for how strongly shakes from the motion sensor come through.
 - **Device:** quality (auto, low, medium or high), invert motion, keep screen awake, stats overlay.
 
 On **Auto** quality, the app starts at High on desktop and Medium on phones. It steps down when the frame rate stays under 45 fps.

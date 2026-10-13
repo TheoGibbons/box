@@ -143,6 +143,9 @@ async function main(): Promise<void> {
           case 'friction':
             sim.setMaterial(s.bounciness, s.friction);
             break;
+          case 'shakeStrength':
+          case 'shakeSensitivity':
+            break;
           case 'quality':
             slowWindows = 0;
             view.setQuality(initialQuality());
@@ -200,8 +203,10 @@ async function main(): Promise<void> {
   }
 
   function shake(strength = 10): void {
+    const impulse = strength * s.shakeStrength;
+    if (impulse === 0) return;
     if (paused) setPaused(false);
-    sim.shake(strength);
+    sim.shake(impulse);
   }
 
   function level(): void {

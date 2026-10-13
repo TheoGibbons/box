@@ -293,6 +293,7 @@ export class UI {
           slider('gravity', 'Gravity', (v) => String(Math.round(v))),
           slider('bounciness', 'Bounciness'),
           slider('friction', 'Friction'),
+          slider('shakeStrength', 'Shake strength', (v) => `${Math.round(v * 100)}%`),
           slider('shakeSensitivity', 'Motion shake boost', (v) => `${v.toFixed(2)}×`),
         ),
         section(
