@@ -18,7 +18,7 @@ npm test             # unit and physics integration tests
 npm run build        # static site in dist/, deploy anywhere (relative paths)
 ```
 
-To try it on a phone, run `npm run dev:https`, open the `https://<your-ip>:5173` URL it prints and accept the certificate warning. On iPhone, tap the phone button to grant motion access. Android starts using motion automatically.
+To try it on a phone, run `npm run dev:https`, open the `https://<your-ip>:5173` URL it prints and accept the certificate warning. Phone motion is on by default: Android starts it automatically, and on iPhone the first tap anywhere asks for access. If you turn motion off with the phone button, that choice is remembered.
 
 ## Controls
 
@@ -31,6 +31,7 @@ To try it on a phone, run `npm run dev:https`, open the `https://<your-ip>:5173`
 | Shake | <kbd>Space</kbd> or the red button | physically shake, or the red button |
 | Pause / respawn / level | <kbd>P</kbd> / <kbd>R</kbd> / <kbd>L</kbd> | toolbar |
 | Motion · fullscreen · hide UI · settings | <kbd>M</kbd> · <kbd>F</kbd> · <kbd>H</kbd> · <kbd>S</kbd> | toolbar |
+| Tuck the toolbar away | the tab under it | the tab under it |
 
 ## Settings
 

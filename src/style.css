@@ -54,11 +54,64 @@ button {
 
 /* ---- toolbar -------------------------------------------------------------- */
 
-.toolbar {
+.topbar {
   position: fixed;
   left: 50%;
-  bottom: calc(16px + var(--safe-b));
+  top: calc(12px + var(--safe-t));
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s;
+  z-index: 10;
+}
+
+/* Collapsed: slide up so only the tab (22px) stays on screen. */
+.topbar.collapsed {
+  transform: translate(-50%, calc(-100% + 22px));
+}
+
+.topbar.collapsed .toolbar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.handle {
+  width: 52px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.handle:hover {
+  color: var(--text);
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+.handle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s;
+}
+
+.topbar.collapsed .handle svg {
+  transform: rotate(180deg);
+}
+
+.toolbar {
   display: flex;
   gap: 4px;
   padding: 6px;
@@ -68,8 +121,7 @@ button {
   backdrop-filter: blur(14px) saturate(1.4);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  transition: opacity 0.3s, transform 0.3s;
-  z-index: 10;
+  transition: opacity 0.3s;
 }
 
 .tool {
@@ -136,9 +188,9 @@ button {
 
 .panel {
   position: fixed;
-  top: calc(12px + var(--safe-t));
+  top: calc(104px + var(--safe-t));
   right: calc(12px + var(--safe-r));
-  bottom: calc(84px + var(--safe-b));
+  bottom: calc(12px + var(--safe-b));
   width: min(340px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
@@ -406,7 +458,7 @@ kbd {
 
 .stats {
   position: fixed;
-  top: calc(12px + var(--safe-t));
+  bottom: calc(12px + var(--safe-b));
   left: calc(12px + var(--safe-l));
   padding: 8px 10px;
   border-radius: 10px;
@@ -421,8 +473,8 @@ kbd {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(84px + var(--safe-b));
-  transform: translate(-50%, 10px);
+  top: calc(104px + var(--safe-t)); /* below the toolbar and its tab */
+  transform: translate(-50%, -10px);
   max-width: calc(100vw - 32px);
   padding: 10px 16px;
   border-radius: 12px;
@@ -464,10 +516,10 @@ kbd {
   }
 }
 
-.ui-hidden .toolbar {
+.ui-hidden .topbar {
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 20px);
+  transform: translate(-50%, -20px);
 }
 
 .ui-hidden .stats {
@@ -481,9 +533,9 @@ kbd {
     left: 8px;
     right: 8px;
     width: auto;
-    bottom: calc(80px + var(--safe-b));
+    bottom: calc(8px + var(--safe-b));
     max-height: 62vh;
-    transform: translateY(calc(100% + 100px));
+    transform: translateY(calc(100% + 40px));
   }
 
   .tool {
@@ -495,6 +547,7 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .panel,
   .toast,
+  .topbar,
   .toolbar {
     transition: none;
   }

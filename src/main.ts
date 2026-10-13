@@ -214,9 +214,11 @@ async function main(): Promise<void> {
   async function toggleMotion(): Promise<void> {
     if (motion.active || motion.state === 'waiting') {
       motion.disable();
+      setMotionPref(false);
       ui.toast('Phone motion off — drag to tilt');
       return;
     }
+    setMotionPref(true);
     const result = await motion.enable();
     const messages: Partial<Record<MotionState, string>> = {
       waiting: 'Tilt your phone to move everything',
@@ -225,6 +227,32 @@ async function main(): Promise<void> {
       unsupported: 'No motion sensor found on this device',
     };
     if (messages[result]) ui.toast(messages[result]!, 3500);
+  }
+
+  function setMotionPref(on: boolean): void {
+    if (s.motion === on) return;
+    s = { ...s, motion: on };
+    persist();
+  }
+
+  /**
+   * iOS only grants motion access from inside a user gesture, so "on by
+   * default" there means the first tap anywhere asks for it. Taps on the
+   * toolbar are left to its own buttons.
+   */
+  function enableMotionOnFirstTap(): void {
+    const handler = (e: Event) => {
+      if ((e.target as Element | null)?.closest?.('.toolbar, .panel')) return;
+      window.removeEventListener('touchend', handler, true);
+      window.removeEventListener('click', handler, true);
+      if (motion.state === 'needs-permission') {
+        void motion.enable().then((r) => {
+          if (r === 'denied') ui.toast('Motion access was denied — drag to tilt instead', 3500);
+        });
+      }
+    };
+    window.addEventListener('touchend', handler, true);
+    window.addEventListener('click', handler, true);
   }
 
   function toggleFullscreen(): void {
@@ -365,9 +393,12 @@ async function main(): Promise<void> {
   respawn();
   view.updateLight(pose, s.lightFollowsTilt);
 
-  if (motion.state === 'off' && mobile) void motion.enable(); // Android: no prompt needed
+  if (mobile && s.motion) {
+    if (motion.state === 'off') void motion.enable(); // Android: no prompt needed
+    else if (motion.state === 'needs-permission') enableMotionOnFirstTap();
+  }
   setTimeout(() => {
-    if (motion.state === 'needs-permission') ui.toast('Tap the phone button to steer with motion', 4000);
+    if (motion.state === 'needs-permission' && s.motion) ui.toast('Tap anywhere to steer with your phone’s motion', 4000);
     else if (!motion.active) ui.toast(mobile ? 'Drag to tilt · tap to blast' : 'Drag to tilt · click to blast · Space to shake', 4000);
   }, 600);
 

@@ -46,6 +46,10 @@ export interface Settings {
   showStats: boolean;
   invertMotion: boolean;
   keepAwake: boolean;
+  /** Steer with the phone's motion sensors when available (toggled by the toolbar button). */
+  motion: boolean;
+  /** Toolbar tucked away behind its chevron tab. */
+  toolbarCollapsed: boolean;
 }
 
 export const LIMITS = {
@@ -97,6 +101,8 @@ export function defaultSettings(mobile: boolean): Settings {
     showStats: false,
     invertMotion: false,
     keepAwake: false,
+    motion: true,
+    toolbarCollapsed: false,
   };
 }
 
